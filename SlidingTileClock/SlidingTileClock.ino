@@ -242,37 +242,38 @@ void loop() {
   Serial.print("New hours  : "); Serial.print(newHourTileTenth); Serial.println(newHourTileUnit); 
   Serial.print("New minutes: "); Serial.print(newMinuteTileTenth); Serial.println(newMinuteTileUnit); 
   
-  //set minute unit tile  
-  if (newMinuteTileUnit > actualMinuteTileUnit) {
-    rotateTile((newMinuteTileUnit-actualMinuteTileUnit), hourunitdigitmotor);
-  }
-  else if (newMinuteTileUnit < actualMinuteTileUnit){
-    rotateTile((newMinuteTileUnit + 10 - actualMinuteTileUnit), hourunitdigitmotor);
-  }
+  // Update dials in random order
+  int order[4] = {0, 1, 2, 3};
+  for (int i = 3; i > 0; i--) { int j = random(i + 1); int t = order[i]; order[i] = order[j]; order[j] = t; }
 
-  //set minute tenth tile 
-  if (newMinuteTileTenth > actualMinuteTileTenth) {
-    rotateTile((newMinuteTileTenth - actualMinuteTileTenth), minutetenthdigitmotor);
-  }
-  else if (newMinuteTileTenth < actualMinuteTileTenth) {
-    rotateTile((newMinuteTileTenth + 6 - actualMinuteTileTenth), minutetenthdigitmotor);
-  }
-
-  //set hour unit tile
-  if (newHourTileUnit > actualHourTileUnit){
-   rotateTile((newHourTileUnit-actualHourTileUnit), minuteunitdigitmotor); 
-  }
-  else if (newHourTileUnit < actualHourTileUnit){
-    rotateTile((newHourTileUnit + 10 - actualHourTileUnit), minuteunitdigitmotor);
-  }
-
-  //set hour tenth tile
   int hourTenthWrap = TWELVE_HOUR ? 2 : 3;
-  if (newHourTileTenth > actualHourTileTenth) {
-    rotateTile((newHourTileTenth - actualHourTileTenth), hourtenthdigitmotor);
-  }
-  else if (newHourTileTenth < actualHourTileTenth) {
-    rotateTile((newHourTileTenth + hourTenthWrap - actualHourTileTenth), hourtenthdigitmotor);
+  for (int i = 0; i < 4; i++) {
+    switch (order[i]) {
+      case 0: // minute unit
+        if (newMinuteTileUnit > actualMinuteTileUnit)
+          rotateTile((newMinuteTileUnit - actualMinuteTileUnit), hourunitdigitmotor);
+        else if (newMinuteTileUnit < actualMinuteTileUnit)
+          rotateTile((newMinuteTileUnit + 10 - actualMinuteTileUnit), hourunitdigitmotor);
+        break;
+      case 1: // minute tenth
+        if (newMinuteTileTenth > actualMinuteTileTenth)
+          rotateTile((newMinuteTileTenth - actualMinuteTileTenth), minutetenthdigitmotor);
+        else if (newMinuteTileTenth < actualMinuteTileTenth)
+          rotateTile((newMinuteTileTenth + 6 - actualMinuteTileTenth), minutetenthdigitmotor);
+        break;
+      case 2: // hour unit
+        if (newHourTileUnit > actualHourTileUnit)
+          rotateTile((newHourTileUnit - actualHourTileUnit), minuteunitdigitmotor);
+        else if (newHourTileUnit < actualHourTileUnit)
+          rotateTile((newHourTileUnit + 10 - actualHourTileUnit), minuteunitdigitmotor);
+        break;
+      case 3: // hour tenth
+        if (newHourTileTenth > actualHourTileTenth)
+          rotateTile((newHourTileTenth - actualHourTileTenth), hourtenthdigitmotor);
+        else if (newHourTileTenth < actualHourTileTenth)
+          rotateTile((newHourTileTenth + hourTenthWrap - actualHourTileTenth), hourtenthdigitmotor);
+        break;
+    }
   }
 
   actualMinuteTileUnit = newMinuteTileUnit;
