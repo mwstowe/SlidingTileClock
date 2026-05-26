@@ -123,7 +123,7 @@ button{padding:0.4em 1em}</style></head><body>
 <h2>Sliding Tile Clock</h2>
 <form action='/setpos' method='get'>
 <fieldset><legend>Set Current Dial Position</legend>
-<label>Hour tens: <select name='ht'><option>0</option><option>1</option></select></label>
+<label>Hour tens: <select name='ht'><option>0</option><option>1</option><option>2</option></select></label>
 <label>Hour units: <select name='hu'>)rawliteral";
   for (int i = 0; i <= 9; i++) html += "<option>" + String(i) + "</option>";
   html += R"rawliteral(</select></label><br>
@@ -267,11 +267,12 @@ void loop() {
   }
 
   //set hour tenth tile
+  int hourTenthWrap = TWELVE_HOUR ? 2 : 3;
   if (newHourTileTenth > actualHourTileTenth) {
     rotateTile((newHourTileTenth - actualHourTileTenth), hourtenthdigitmotor);
   }
   else if (newHourTileTenth < actualHourTileTenth) {
-    rotateTile((newHourTileTenth + 3 - actualHourTileTenth), hourtenthdigitmotor);
+    rotateTile((newHourTileTenth + hourTenthWrap - actualHourTileTenth), hourtenthdigitmotor);
   }
 
   actualMinuteTileUnit = newMinuteTileUnit;
