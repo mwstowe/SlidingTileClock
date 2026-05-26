@@ -34,7 +34,7 @@ int motor3[4] = {5,4,3,2};
 int motor4[4] = {A3,A2,A1,A0};
 
 // Motors indexed by digit: 0=minute unit, 1=minute tenth, 2=hour unit, 3=hour tenth
-int *motors[4] = {motor1, motor2, motor3, motor4};
+int *motors[4] = {motor1, motor2, motor4, motor3};
 
 // sequence of stepper motor control
 int seq[8][4] = {
