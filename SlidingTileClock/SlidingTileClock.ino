@@ -9,6 +9,7 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <WebServer.h>
+#include <ESPmDNS.h>
 #include <TimeLib.h>
 #include <NTP.h>
 #include "credentials.h"
@@ -215,8 +216,10 @@ void setup() {
   server.on("/setpos", handleSetPos);
   server.on("/nudge", handleNudge);
   server.begin();
-  Serial.print("Web server at http://");
-  Serial.println(WiFi.localIP());
+  MDNS.begin("st");
+  Serial.print("Web server at http://st.local (");
+  Serial.print(WiFi.localIP());
+  Serial.println(")");
   }
 
 void loop() {
