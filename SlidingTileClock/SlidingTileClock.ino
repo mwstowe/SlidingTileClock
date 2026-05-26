@@ -88,6 +88,24 @@ void rotateTile(int steps, int motorport[4]) {
   }
 }
 
+// Serial command: "<motor> <steps>" where motor is 1-4 and steps can be negative
+// Motors: 1=hourunit, 2=minutetenth, 3=minuteunit, 4=hourtenth
+int *motors[4] = {hourunitdigitmotor, minutetenthdigitmotor, minuteunitdigitmotor, hourtenthdigitmotor};
+
+void handleSerial() {
+  if (!Serial.available()) return;
+  String cmd = Serial.readStringUntil('\n');
+  cmd.trim();
+  int spaceIdx = cmd.indexOf(' ');
+  if (spaceIdx < 0) return;
+  int motor = cmd.substring(0, spaceIdx).toInt();
+  int steps = cmd.substring(spaceIdx + 1).toInt();
+  if (motor < 1 || motor > 4 || steps == 0) return;
+  Serial.print("Motor "); Serial.print(motor);
+  Serial.print(" steps "); Serial.println(steps);
+  rotate(steps, motors[motor - 1]);
+}
+
 void setup() {
   Serial.begin(9600);
   WiFi.begin(ssid, password);
@@ -126,6 +144,7 @@ void setup() {
   }
 
 void loop() {
+  handleSerial();
   ntp.update();
   Serial.println(ntp.formattedTime("%d. %B %Y")); // dd. Mmm yyyy
   Serial.println(ntp.formattedTime("%A %T")); // Www hh:mm:ss
