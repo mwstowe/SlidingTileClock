@@ -34,7 +34,7 @@ int motor3[4] = {5,4,3,2};
 int motor4[4] = {A3,A2,A1,A0};
 
 // Motors indexed by digit: 0=minute unit, 1=minute tenth, 2=hour unit, 3=hour tenth
-int *motors[4] = {motor1, motor2, motor4, motor3};
+int *motors[4] = {motor1, motor2, motor3, motor4};
 
 // sequence of stepper motor control
 int seq[8][4] = {
@@ -138,6 +138,9 @@ button{padding:0.4em 1em}</style></head><body>
 <p>Current position: )rawliteral";
   html += String(actualHourTileTenth) + String(actualHourTileUnit) + ":" +
           String(actualMinuteTileTenth) + String(actualMinuteTileUnit);
+  html += "</p><p>Target: " + String(newHourTileTenth) + String(newHourTileUnit) + ":" +
+          String(newMinuteTileTenth) + String(newMinuteTileUnit);
+  html += "</p><p>NTP hour: " + String(ntp.hours()) + " min: " + String(ntp.minutes());
   html += "</p><p>IP: " + WiFi.localIP().toString() + "</p></body></html>";
   server.send(200, "text/html", html);
 }
