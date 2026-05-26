@@ -25,18 +25,16 @@ const char *ntpServer = "0.nl.pool.ntp.org";
 // Stepper setings
 int delaytime = 2;  // wait for a single step of stepper
 
-// ports used to control the stepper motor
-// if your motor rotate to the opposite direction, 
-// change the order as {4, 3, 2, 1};
-//int hourunitdigitmotor[4] = {10,11,12,13};  // minute motor units
-//int minutetenthdigitmotor[4] = {6,7,8,9};      // minute motor tenth
-//int minuteunitdigitmotor[4] = {2,3,4,5};      // hour motor units
-//int hourtenthdigitmotor[4] = {A0,A1,A2,A3};  // hour motor tenth
+// Motor pin assignments (names reflect physical wiring position, not digit driven)
+// Actual mapping: motor1 drives minute units, motor2 drives minute tens,
+//                 motor3 drives hour units, motor4 drives hour tens
+int motor1[4] = {13,12,11,10};
+int motor2[4] = {9,8,7,6};
+int motor3[4] = {5,4,3,2};
+int motor4[4] = {A3,A2,A1,A0};
 
-int hourunitdigitmotor[4] = {13,12,11,10};  // minute motor units
-int minutetenthdigitmotor[4] = {9,8,7,6};      // minute motor tenth
-int minuteunitdigitmotor[4] = {5,4,3,2};      // hour motor units
-int hourtenthdigitmotor[4] = {A3,A2,A1,A0};  // hour motor tenth
+// Motors indexed by digit: 0=minute unit, 1=minute tenth, 2=hour unit, 3=hour tenth
+int *motors[4] = {motor1, motor2, motor3, motor4};
 
 // sequence of stepper motor control
 int seq[8][4] = {
@@ -94,10 +92,6 @@ void rotateTile(int steps, int motorport[4]) {
   }
 }
 
-// Serial command: "<motor> <steps>" where motor is 1-4 and steps can be negative
-// Motors: 1=hourunit, 2=minutetenth, 3=minuteunit, 4=hourtenth
-int *motors[4] = {hourunitdigitmotor, minutetenthdigitmotor, minuteunitdigitmotor, hourtenthdigitmotor};
-
 void handleSerial() {
   if (!Serial.available()) return;
   String cmd = Serial.readStringUntil('\n');
@@ -136,8 +130,8 @@ button{padding:0.4em 1em}</style></head><body>
 <form action='/nudge' method='get'>
 <fieldset><legend>Nudge Alignment (steps)</legend>
 <label>Motor: <select name='m'>
-<option value='1'>Hour units</option><option value='2'>Min tens</option>
-<option value='3'>Hour tens</option><option value='4'>Min units</option>
+<option value='1'>Min units</option><option value='2'>Min tens</option>
+<option value='3'>Hour units</option><option value='4'>Hour tens</option>
 </select></label>
 <label>Steps: <input type='number' name='s' value='50' style='width:5em'></label>
 <button type='submit'>Nudge</button></fieldset></form>
@@ -180,22 +174,9 @@ void setup() {
   Serial.println("start NTP");
   delay (500);
 
-  pinMode(hourunitdigitmotor[0], OUTPUT);
-  pinMode(hourunitdigitmotor[1], OUTPUT);
-  pinMode(hourunitdigitmotor[2], OUTPUT);
-  pinMode(hourunitdigitmotor[3], OUTPUT);
-  pinMode(minutetenthdigitmotor[0], OUTPUT);
-  pinMode(minutetenthdigitmotor[1], OUTPUT);
-  pinMode(minutetenthdigitmotor[2], OUTPUT);
-  pinMode(minutetenthdigitmotor[3], OUTPUT);
-  pinMode(minuteunitdigitmotor[0], OUTPUT);
-  pinMode(minuteunitdigitmotor[1], OUTPUT);
-  pinMode(minuteunitdigitmotor[2], OUTPUT);
-  pinMode(minuteunitdigitmotor[3], OUTPUT);
-  pinMode(hourtenthdigitmotor[0], OUTPUT);
-  pinMode(hourtenthdigitmotor[1], OUTPUT);
-  pinMode(hourtenthdigitmotor[2], OUTPUT);
-  pinMode(hourtenthdigitmotor[3], OUTPUT);
+  for (int m = 0; m < 4; m++)
+    for (int p = 0; p < 4; p++)
+      pinMode(motors[m][p], OUTPUT);
   digitalWrite(A0, LOW);
   digitalWrite(A1, LOW);
   digitalWrite(A2, LOW);
@@ -246,27 +227,27 @@ void loop() {
     switch (order[i]) {
       case 0: // minute unit
         if (newMinuteTileUnit > actualMinuteTileUnit)
-          rotateTile((newMinuteTileUnit - actualMinuteTileUnit), hourunitdigitmotor);
+          rotateTile((newMinuteTileUnit - actualMinuteTileUnit), motors[0]);
         else if (newMinuteTileUnit < actualMinuteTileUnit)
-          rotateTile((newMinuteTileUnit + 10 - actualMinuteTileUnit), hourunitdigitmotor);
+          rotateTile((newMinuteTileUnit + 10 - actualMinuteTileUnit), motors[0]);
         break;
       case 1: // minute tenth
         if (newMinuteTileTenth > actualMinuteTileTenth)
-          rotateTile((newMinuteTileTenth - actualMinuteTileTenth), minutetenthdigitmotor);
+          rotateTile((newMinuteTileTenth - actualMinuteTileTenth), motors[1]);
         else if (newMinuteTileTenth < actualMinuteTileTenth)
-          rotateTile((newMinuteTileTenth + 6 - actualMinuteTileTenth), minutetenthdigitmotor);
+          rotateTile((newMinuteTileTenth + 6 - actualMinuteTileTenth), motors[1]);
         break;
       case 2: // hour unit
         if (newHourTileUnit > actualHourTileUnit)
-          rotateTile((newHourTileUnit - actualHourTileUnit), minuteunitdigitmotor);
+          rotateTile((newHourTileUnit - actualHourTileUnit), motors[2]);
         else if (newHourTileUnit < actualHourTileUnit)
-          rotateTile((newHourTileUnit + 10 - actualHourTileUnit), minuteunitdigitmotor);
+          rotateTile((newHourTileUnit + 10 - actualHourTileUnit), motors[2]);
         break;
       case 3: // hour tenth
         if (newHourTileTenth > actualHourTileTenth)
-          rotateTile((newHourTileTenth - actualHourTileTenth), hourtenthdigitmotor);
+          rotateTile((newHourTileTenth - actualHourTileTenth), motors[3]);
         else if (newHourTileTenth < actualHourTileTenth)
-          rotateTile((newHourTileTenth + hourTenthWrap - actualHourTileTenth), hourtenthdigitmotor);
+          rotateTile((newHourTileTenth + hourTenthWrap - actualHourTileTenth), motors[3]);
         break;
     }
   }
