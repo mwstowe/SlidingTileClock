@@ -225,7 +225,7 @@ void loop() {
   int order[4] = {0, 1, 2, 3};
   for (int i = 3; i > 0; i--) { int j = random(i + 1); int t = order[i]; order[i] = order[j]; order[j] = t; }
 
-  int hourTenthWrap = TWELVE_HOUR ? 2 : 3;
+  int hourTenthWrap = 3;  // physical dial has 3 tiles (0,1,2)
   for (int i = 0; i < 4; i++) {
     switch (order[i]) {
       case 0: // minute unit
