@@ -97,8 +97,8 @@ void setup() {
     }
   Serial.println("Connected");  
   ntp.updateInterval(60000); // update every minute
-  ntp.ruleDST("PDT", Last, Sun, Mar, 2, 120); // last sunday in march 2:00, timezone +120min (+1 GMT + 1h summertime offset)
-  ntp.ruleSTD("PST", Last, Sun, Oct, 3, 60); // last sunday in october 3:00, timezone +60min (+1 GMT)
+  ntp.ruleDST("PDT", Second, Sun, Mar, 2, -420); // second Sunday in March 2:00, UTC-7
+  ntp.ruleSTD("PST", First, Sun, Nov, 2, -480); // first Sunday in November 2:00, UTC-8
   ntp.begin(ntpServer);
   Serial.println("start NTP");
   delay (500);
