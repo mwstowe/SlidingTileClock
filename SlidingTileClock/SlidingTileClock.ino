@@ -10,7 +10,6 @@
 #include <WiFiUdp.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
-#include <TimeLib.h>
 #include <NTP.h>
 #include "credentials.h"
 
@@ -204,11 +203,10 @@ void setup() {
 
   // Assume dials already show current time at power-on
   ntp.update();
-  setTime(ntp.hours(),ntp.minutes(),ntp.seconds(),ntp.day(),ntp.month(),ntp.year());
-  int h = hour();
+  int h = ntp.hours();
   if (TWELVE_HOUR) { h = h % 12; if (h == 0) h = 12; }
-  actualMinuteTileUnit = minute()%10;
-  actualMinuteTileTenth = minute()/10;
+  actualMinuteTileUnit = ntp.minutes()%10;
+  actualMinuteTileTenth = ntp.minutes()/10;
   actualHourTileUnit = h%10;
   actualHourTileTenth = h/10;
 
@@ -229,12 +227,9 @@ void loop() {
   Serial.println(ntp.formattedTime("%d. %B %Y")); // dd. Mmm yyyy
   Serial.println(ntp.formattedTime("%A %T")); // Www hh:mm:ss
   
-  if (ntp.hours()!=hour() || ntp.minutes()!=minute()) { 
-    setTime(ntp.hours(),ntp.minutes(),ntp.seconds(),ntp.day(),ntp.month(),ntp.year());};  // synchroniseer clock when ther is a time diverence
-  
-  newMinuteTileUnit = minute()%10;
-  newMinuteTileTenth = minute()/10;
-  int h = hour();
+  newMinuteTileUnit = ntp.minutes()%10;
+  newMinuteTileTenth = ntp.minutes()/10;
+  int h = ntp.hours();
   if (TWELVE_HOUR) { h = h % 12; if (h == 0) h = 12; }
   newHourTileUnit = h%10;
   newHourTileTenth = h/10;
