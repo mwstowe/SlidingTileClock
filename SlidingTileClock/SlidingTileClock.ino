@@ -8,9 +8,12 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <WebServer.h>
 #include <TimeLib.h>
 #include <NTP.h>
 #include "credentials.h"
+
+WebServer server(80);
 
 
 WiFiUDP wifiUdp;
@@ -49,6 +52,9 @@ int seq[8][4] = {
 
 // number steps to turn one Tile
 const int HALFSTEPS = 2048;
+
+// Set to true for 12-hour display, false for 24-hour
+const bool TWELVE_HOUR = true;
 
 int actualMinuteTileUnit = 0;
 int actualMinuteTileTenth = 0;
@@ -106,6 +112,59 @@ void handleSerial() {
   rotate(steps, motors[motor - 1]);
 }
 
+void handleRoot() {
+  String html = R"rawliteral(
+<!DOCTYPE html><html><head><title>Sliding Tile Clock</title>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<style>body{font-family:sans-serif;max-width:480px;margin:auto;padding:1em}
+fieldset{margin:1em 0}select,button{font-size:1.2em;margin:0.2em}
+button{padding:0.4em 1em}</style></head><body>
+<h2>Sliding Tile Clock</h2>
+<form action='/setpos' method='get'>
+<fieldset><legend>Set Current Dial Position</legend>
+<label>Hour tens: <select name='ht'><option>0</option><option>1</option></select></label>
+<label>Hour units: <select name='hu'>)rawliteral";
+  for (int i = 0; i <= 9; i++) html += "<option>" + String(i) + "</option>";
+  html += R"rawliteral(</select></label><br>
+<label>Min tens: <select name='mt'>)rawliteral";
+  for (int i = 0; i <= 5; i++) html += "<option>" + String(i) + "</option>";
+  html += R"rawliteral(</select></label>
+<label>Min units: <select name='mu'>)rawliteral";
+  for (int i = 0; i <= 9; i++) html += "<option>" + String(i) + "</option>";
+  html += R"rawliteral(</select></label><br>
+<button type='submit'>Set Position</button></fieldset></form>
+<form action='/nudge' method='get'>
+<fieldset><legend>Nudge Alignment (steps)</legend>
+<label>Motor: <select name='m'>
+<option value='1'>Hour units</option><option value='2'>Min tens</option>
+<option value='3'>Hour tens</option><option value='4'>Min units</option>
+</select></label>
+<label>Steps: <input type='number' name='s' value='50' style='width:5em'></label>
+<button type='submit'>Nudge</button></fieldset></form>
+<p>Current position: )rawliteral";
+  html += String(actualHourTileTenth) + String(actualHourTileUnit) + ":" +
+          String(actualMinuteTileTenth) + String(actualMinuteTileUnit);
+  html += "</p><p>IP: " + WiFi.localIP().toString() + "</p></body></html>";
+  server.send(200, "text/html", html);
+}
+
+void handleSetPos() {
+  if (server.hasArg("ht")) actualHourTileTenth = server.arg("ht").toInt();
+  if (server.hasArg("hu")) actualHourTileUnit = server.arg("hu").toInt();
+  if (server.hasArg("mt")) actualMinuteTileTenth = server.arg("mt").toInt();
+  if (server.hasArg("mu")) actualMinuteTileUnit = server.arg("mu").toInt();
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void handleNudge() {
+  int m = server.arg("m").toInt();
+  int s = server.arg("s").toInt();
+  if (m >= 1 && m <= 4 && s != 0) rotate(s, motors[m - 1]);
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
 void setup() {
   Serial.begin(9600);
   WiFi.begin(ssid, password);
@@ -140,10 +199,28 @@ void setup() {
   digitalWrite(A0, LOW);
   digitalWrite(A1, LOW);
   digitalWrite(A2, LOW);
-  digitalWrite(A3, LOW); 
+  digitalWrite(A3, LOW);
+
+  // Assume dials already show current time at power-on
+  ntp.update();
+  setTime(ntp.hours(),ntp.minutes(),ntp.seconds(),ntp.day(),ntp.month(),ntp.year());
+  int h = hour();
+  if (TWELVE_HOUR) { h = h % 12; if (h == 0) h = 12; }
+  actualMinuteTileUnit = minute()%10;
+  actualMinuteTileTenth = minute()/10;
+  actualHourTileUnit = h%10;
+  actualHourTileTenth = h/10;
+
+  server.on("/", handleRoot);
+  server.on("/setpos", handleSetPos);
+  server.on("/nudge", handleNudge);
+  server.begin();
+  Serial.print("Web server at http://");
+  Serial.println(WiFi.localIP());
   }
 
 void loop() {
+  server.handleClient();
   handleSerial();
   ntp.update();
   Serial.println(ntp.formattedTime("%d. %B %Y")); // dd. Mmm yyyy
@@ -154,8 +231,10 @@ void loop() {
   
   newMinuteTileUnit = minute()%10;
   newMinuteTileTenth = minute()/10;
-  newHourTileUnit = hour()%10;
-  newHourTileTenth = hour()/10;
+  int h = hour();
+  if (TWELVE_HOUR) { h = h % 12; if (h == 0) h = 12; }
+  newHourTileUnit = h%10;
+  newHourTileTenth = h/10;
 
   Serial.print("New hours  : "); Serial.print(newHourTileTenth); Serial.println(newHourTileUnit); 
   Serial.print("New minutes: "); Serial.print(newMinuteTileTenth); Serial.println(newMinuteTileUnit); 
