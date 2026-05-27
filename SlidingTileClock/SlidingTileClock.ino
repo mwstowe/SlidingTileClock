@@ -2,7 +2,7 @@
 /*
   WiFi connected Sliding Tile Clock. 
   This sketch gets current time from NTP server.
-  On start or reset all sliding tiles should be zero 00:00  
+  On start or reset, dials are assumed to already show the current time.
 */
 
 #include <Arduino.h>
@@ -64,11 +64,18 @@ int newMinuteTileTenth = 0;
 int newHourTileUnit = 0;
 int newHourTileTenth = 0;
 
+// Per-motor stepper phase tracking
+int motorPhase[4] = {0, 0, 0, 0};
+
 // functions
 
+int motorIndex(int motorport[4]) {
+  for (int i = 0; i < 4; i++) if (motors[i] == motorport) return i;
+  return 0;
+}
 
 void rotate(int step, int motorport[4]) {
-  static int phase = 0;
+  int &phase = motorPhase[motorIndex(motorport)];
   int i, j;
   int delta = (step > 0) ? 1 : 7;
 
@@ -89,6 +96,7 @@ void rotate(int step, int motorport[4]) {
 void rotateTile(int steps, int motorport[4]) {
   for (int i = 0; i < steps; i++) {
     rotate(HALFSTEPS, motorport);
+    server.handleClient();
   }
 }
 
@@ -205,6 +213,12 @@ void setup() {
   }
 
 void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi lost, reconnecting...");
+    WiFi.reconnect();
+    delay(5000);
+    return;
+  }
   server.handleClient();
   handleSerial();
   ntp.update();
@@ -220,7 +234,16 @@ void loop() {
 
   Serial.print("New hours  : "); Serial.print(newHourTileTenth); Serial.println(newHourTileUnit); 
   Serial.print("New minutes: "); Serial.print(newMinuteTileTenth); Serial.println(newMinuteTileUnit); 
-  
+
+  // Skip motor updates if nothing changed
+  if (newMinuteTileUnit == actualMinuteTileUnit &&
+      newMinuteTileTenth == actualMinuteTileTenth &&
+      newHourTileUnit == actualHourTileUnit &&
+      newHourTileTenth == actualHourTileTenth) {
+    delay(1000);
+    return;
+  }
+
   // Update dials in random order
   int order[4] = {0, 1, 2, 3};
   for (int i = 3; i > 0; i--) { int j = random(i + 1); int t = order[i]; order[i] = order[j]; order[j] = t; }
