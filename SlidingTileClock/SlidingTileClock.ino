@@ -64,7 +64,13 @@ int newMinuteTileTenth = 0;
 int newHourTileUnit = 0;
 int newHourTileTenth = 0;
 
-// Per-motor stepper phase tracking
+// Glitch filtering: only accept a new time if seen twice in a row
+int prevHourReading = -1;
+int prevMinReading = -1;
+
+// Last movement diagnostic info
+String lastMoveInfo = "none";
+
 int motorPhase[4] = {0, 0, 0, 0};
 
 // functions
@@ -149,7 +155,9 @@ button{padding:0.4em 1em}</style></head><body>
   html += "</p><p>Target: " + String(newHourTileTenth) + String(newHourTileUnit) + ":" +
           String(newMinuteTileTenth) + String(newMinuteTileUnit);
   html += "</p><p>NTP hour: " + String(ntp.hours()) + " min: " + String(ntp.minutes());
-  html += "</p><p>IP: " + WiFi.localIP().toString() + "</p></body></html>";
+  struct tm ti; time_t n = time(nullptr); localtime_r(&n, &ti);
+  html += "</p><p>Sys hour: " + String(ti.tm_hour) + " min: " + String(ti.tm_min) + " sec: " + String(ti.tm_sec);
+  html += "</p><p>IP: " + WiFi.localIP().toString() + "</p><p>Last move: " + lastMoveInfo + "</p><p>FW: v5</p></body></html>";
   server.send(200, "text/html", html);
 }
 
@@ -178,6 +186,9 @@ void setup() {
     delay(500);
     }
   Serial.println("Connected");  
+  // Set POSIX timezone for Pacific Time (used by localtime_r)
+  setenv("TZ", "PST8PDT,M3.2.0,M11.1.0", 1);
+  tzset();
   ntp.updateInterval(60000); // update every minute
   ntp.ruleDST("PDT", Second, Sun, Mar, 2, -420); // second Sunday in March 2:00, UTC-7
   ntp.ruleSTD("PST", First, Sun, Nov, 2, -480); // first Sunday in November 2:00, UTC-8
@@ -195,12 +206,22 @@ void setup() {
 
   // Assume dials already show current time at power-on
   ntp.update();
-  int h = ntp.hours();
+  struct tm timeinfo;
+  time_t now = time(nullptr);
+  localtime_r(&now, &timeinfo);
+  int h = timeinfo.tm_hour;
+  int m = timeinfo.tm_min;
   if (TWELVE_HOUR) { h = h % 12; if (h == 0) h = 12; }
-  actualMinuteTileUnit = ntp.minutes()%10;
-  actualMinuteTileTenth = ntp.minutes()/10;
+  actualMinuteTileUnit = m % 10;
+  actualMinuteTileTenth = m / 10;
   actualHourTileUnit = h%10;
   actualHourTileTenth = h/10;
+  newHourTileUnit = h%10;
+  newHourTileTenth = h/10;
+  newMinuteTileUnit = m % 10;
+  newMinuteTileTenth = m / 10;
+  prevHourReading = h;
+  prevMinReading = m;
 
   server.on("/", handleRoot);
   server.on("/setpos", handleSetPos);
@@ -222,15 +243,32 @@ void loop() {
   server.handleClient();
   handleSerial();
   ntp.update();
+
+  // Use ESP32 system clock (synced by NTP library via settimeofday)
+  // with POSIX timezone for DST handling, bypassing library's millis() interpolation
+  struct tm timeinfo;
+  time_t now = time(nullptr);
+  localtime_r(&now, &timeinfo);
+  int ntpMin = timeinfo.tm_min;
+  int ntpHour = timeinfo.tm_hour;
   Serial.println(ntp.formattedTime("%d. %B %Y")); // dd. Mmm yyyy
   Serial.println(ntp.formattedTime("%A %T")); // Www hh:mm:ss
   
-  newMinuteTileUnit = ntp.minutes()%10;
-  newMinuteTileTenth = ntp.minutes()/10;
-  int h = ntp.hours();
+  newMinuteTileUnit = ntpMin % 10;
+  newMinuteTileTenth = ntpMin / 10;
+  int h = ntpHour;
   if (TWELVE_HOUR) { h = h % 12; if (h == 0) h = 12; }
-  newHourTileUnit = h%10;
-  newHourTileTenth = h/10;
+
+  // Only accept new time values if consistent with previous reading
+  // This filters single-iteration NTP glitches
+  if (h == prevHourReading && ntpMin == prevMinReading) {
+    newHourTileUnit = h % 10;
+    newHourTileTenth = h / 10;
+    newMinuteTileUnit = ntpMin % 10;
+    newMinuteTileTenth = ntpMin / 10;
+  }
+  prevHourReading = h;
+  prevMinReading = ntpMin;
 
   Serial.print("New hours  : "); Serial.print(newHourTileTenth); Serial.println(newHourTileUnit); 
   Serial.print("New minutes: "); Serial.print(newMinuteTileTenth); Serial.println(newMinuteTileUnit); 
@@ -243,6 +281,13 @@ void loop() {
     delay(1000);
     return;
   }
+
+  lastMoveInfo = "ntp.h=" + String(ntpHour) + " new=" +
+    String(newHourTileTenth) + String(newHourTileUnit) + ":" +
+    String(newMinuteTileTenth) + String(newMinuteTileUnit) + " act=" +
+    String(actualHourTileTenth) + String(actualHourTileUnit) + ":" +
+    String(actualMinuteTileTenth) + String(actualMinuteTileUnit) +
+    " ms=" + String(millis());
 
   // Update dials in random order
   int order[4] = {0, 1, 2, 3};
