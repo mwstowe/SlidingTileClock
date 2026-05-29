@@ -7,19 +7,12 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WiFiUdp.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
-#include <NTP.h>
+#include <time.h>
 #include "credentials.h"
 
 WebServer server(80);
-
-
-WiFiUDP wifiUdp;
-NTP ntp(wifiUdp);
-
-const char *ntpServer = "0.nl.pool.ntp.org";
 
 
 // Stepper setings
@@ -154,10 +147,9 @@ button{padding:0.4em 1em}</style></head><body>
           String(actualMinuteTileTenth) + String(actualMinuteTileUnit);
   html += "</p><p>Target: " + String(newHourTileTenth) + String(newHourTileUnit) + ":" +
           String(newMinuteTileTenth) + String(newMinuteTileUnit);
-  html += "</p><p>NTP hour: " + String(ntp.hours()) + " min: " + String(ntp.minutes());
   struct tm ti; time_t n = time(nullptr); localtime_r(&n, &ti);
-  html += "</p><p>Sys hour: " + String(ti.tm_hour) + " min: " + String(ti.tm_min) + " sec: " + String(ti.tm_sec);
-  html += "</p><p>IP: " + WiFi.localIP().toString() + "</p><p>Last move: " + lastMoveInfo + "</p><p>FW: v5</p></body></html>";
+  html += "</p><p>Sys time: " + String(ti.tm_hour) + ":" + String(ti.tm_min) + ":" + String(ti.tm_sec);
+  html += "</p><p>IP: " + WiFi.localIP().toString() + "</p><p>Last move: " + lastMoveInfo + "</p><p>FW: v6</p></body></html>";
   server.send(200, "text/html", html);
 }
 
@@ -186,15 +178,18 @@ void setup() {
     delay(500);
     }
   Serial.println("Connected");  
-  // Set POSIX timezone for Pacific Time (used by localtime_r)
-  setenv("TZ", "PST8PDT,M3.2.0,M11.1.0", 1);
-  tzset();
-  ntp.updateInterval(60000); // update every minute
-  ntp.ruleDST("PDT", Second, Sun, Mar, 2, -420); // second Sunday in March 2:00, UTC-7
-  ntp.ruleSTD("PST", First, Sun, Nov, 2, -480); // first Sunday in November 2:00, UTC-8
-  ntp.begin(ntpServer);
+  // Configure ESP32 native SNTP and timezone
+  configTzTime("PST8PDT,M3.2.0,M11.1.0", "pool.ntp.org", "time.google.com");
   Serial.println("start NTP");
-  delay (500);
+  
+  // Wait for time to sync
+  struct tm timeinfo;
+  int retries = 0;
+  while (!getLocalTime(&timeinfo) && retries < 10) {
+    Serial.println("Waiting for NTP sync...");
+    delay(1000);
+    retries++;
+  }
 
   for (int m = 0; m < 4; m++)
     for (int p = 0; p < 4; p++)
@@ -205,12 +200,11 @@ void setup() {
   digitalWrite(A3, LOW);
 
   // Assume dials already show current time at power-on
-  ntp.update();
-  struct tm timeinfo;
+  struct tm startTime;
   time_t now = time(nullptr);
-  localtime_r(&now, &timeinfo);
-  int h = timeinfo.tm_hour;
-  int m = timeinfo.tm_min;
+  localtime_r(&now, &startTime);
+  int h = startTime.tm_hour;
+  int m = startTime.tm_min;
   if (TWELVE_HOUR) { h = h % 12; if (h == 0) h = 12; }
   actualMinuteTileUnit = m % 10;
   actualMinuteTileTenth = m / 10;
@@ -242,17 +236,14 @@ void loop() {
   }
   server.handleClient();
   handleSerial();
-  ntp.update();
 
-  // Use ESP32 system clock (synced by NTP library via settimeofday)
-  // with POSIX timezone for DST handling, bypassing library's millis() interpolation
+  // Use ESP32 system clock (synced automatically by SNTP)
   struct tm timeinfo;
   time_t now = time(nullptr);
   localtime_r(&now, &timeinfo);
   int ntpMin = timeinfo.tm_min;
   int ntpHour = timeinfo.tm_hour;
-  Serial.println(ntp.formattedTime("%d. %B %Y")); // dd. Mmm yyyy
-  Serial.println(ntp.formattedTime("%A %T")); // Www hh:mm:ss
+  Serial.printf("%02d:%02d:%02d\n", ntpHour, ntpMin, timeinfo.tm_sec);
   
   newMinuteTileUnit = ntpMin % 10;
   newMinuteTileTenth = ntpMin / 10;
